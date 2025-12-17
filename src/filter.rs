@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 
 use std::ffi::c_void;
+use std::ffi::CStr;
 use std::ffi::CString;
 use std::mem;
 use std::mem::ManuallyDrop;
@@ -570,7 +571,9 @@ where
             if attr_values.is_null() {
                 None
             } else {
-                str::from_utf8(*attr_values.cast()).ok()
+                CStr::from_bytes_until_nul(*attr_values.cast())
+                    .ok()
+                    .and_then(|s| s.to_str().ok())
             },
         )
     }
