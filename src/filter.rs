@@ -1,7 +1,6 @@
 #![allow(missing_docs)]
 
 use std::ffi::c_void;
-use std::ffi::CStr;
 use std::ffi::CString;
 use std::mem;
 use std::mem::ManuallyDrop;
@@ -202,7 +201,12 @@ impl<'f, P> Filter<'f, P> {
 
     pub fn on_check<F>(&mut self, callback: F) -> &mut Self
     where
-        F: Fn(Filter<'f, P>, FilterPayload<P>, FilterSource, Option<&str>) -> Result<bool, Error>
+        F: Fn(
+                Filter<'f, P>,
+                FilterPayload<P>,
+                FilterSource,
+                bool,
+            ) -> Result<bool, Error>
             + 'f,
     {
         if let Some(inner) = unsafe { self.inner.as_mut() } {
@@ -555,7 +559,13 @@ extern "C" fn on_check(
 
 impl<'a, P, F> FilterCheck<'a> for FilterCallback<'a, P, F>
 where
-    F: Fn(Filter<'a, P>, FilterPayload<P>, FilterSource, Option<&str>) -> Result<bool, Error> + 'a,
+    F: Fn(
+            Filter<'a, P>,
+            FilterPayload<P>,
+            FilterSource,
+            bool,
+        ) -> Result<bool, Error>
+        + 'a,
 {
     unsafe fn call(
         &self,
@@ -569,11 +579,9 @@ where
             FilterPayload::<P>::from_raw(payload),
             FilterSource::from_raw(src as *mut _),
             if attr_values.is_null() {
-                None
-            } else {
-                CStr::from_bytes_until_nul(*attr_values.cast())
-                    .ok()
-                    .and_then(|s| s.to_str().ok())
+                false
+              } else {
+                true
             },
         )
     }
