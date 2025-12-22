@@ -35,11 +35,12 @@ url = "2.5.4"
 [features]
 unstable = []
 default = []
-ssh = ["libgit2-sys/ssh", "cred"]
+ssh = ["libgit2-sys/ssh", "cred", "vendored-openssl"]
 https = ["libgit2-sys/https", "cred"]
 # Include support for credentials, which pulls in the `url` crate and all its dependencies
 cred = ["dep:url"]
 vendored-libgit2 = ["libgit2-sys/vendored"]
+use-openssl = ["vendored-openssl", "libgit2-sys/use-openssl"]
 vendored-openssl = ["openssl-sys", "openssl-probe", "openssl-sys/vendored", "libgit2-sys/vendored-openssl"]
 zlib-ng-compat = ["libgit2-sys/zlib-ng-compat"]
 

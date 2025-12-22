@@ -244,7 +244,7 @@ The build is now aborting. To disable, unset the variable or use `LIBGIT2_NO_VEN
     if https {
         features.push_str("#define GIT_HTTPS 1\n");
 
-        if cfg!(feature = "vendored-openssl") {
+        if cfg!(feature = "use-openssl") {
             features.push_str("#define GIT_OPENSSL 1\n");
             if let Some(path) = env::var_os("DEP_OPENSSL_INCLUDE") {
                 cfg.include(path);
@@ -266,7 +266,7 @@ The build is now aborting. To disable, unset the variable or use `LIBGIT2_NO_VEN
     cfg.file("libgit2/src/util/hash/sha1dc/ubc_check.c");
 
     if https {
-        if cfg!(feature = "vendored-openssl") {
+        if cfg!(feature = "use-openssl") {
             features.push_str("#define GIT_SHA256_OPENSSL 1\n");
             cfg.file("libgit2/src/util/hash/openssl.c");
         } else if windows {
