@@ -169,7 +169,7 @@ impl FilterBuf {
     pub fn sync(&mut self) {
         if let Some(data) = &self.data {
             unsafe {
-                (*self.raw).ptr = data.as_ptr() as *mut i8;
+                (*self.raw).ptr = data.as_ptr() as *mut c_char;
                 (*self.raw).size = data.len() as usize;
             }
         }
@@ -247,7 +247,7 @@ impl<'f, P> Filter<'f, P> {
     pub fn attributes(&mut self, attrs: &str) -> Result<&mut Self, Error> {
         if let Some(inner) = unsafe { self.inner.as_mut() } {
             if !inner.raw.attributes.is_null() {
-                drop(unsafe { CString::from_raw(inner.raw.attributes as *mut i8) });
+                drop(unsafe { CString::from_raw(inner.raw.attributes as *mut c_char) });
             }
             inner.raw.attributes = attrs.into_c_string()?.into_raw()
         }
@@ -532,7 +532,7 @@ extern "C" fn on_check(
     filter: *mut raw::git_filter,
     payload: *mut *mut libc::c_void,
     src: *const raw::git_filter_source,
-    attr_values: *const *const i8,
+    attr_values: *const *const c_char,
 ) -> i32 {
     let ok = panic::wrap(|| unsafe {
         let filter = FilterInternal::from_raw(filter as *mut _);
