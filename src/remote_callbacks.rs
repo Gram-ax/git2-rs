@@ -79,7 +79,7 @@ pub type PushUpdateReference<'a> = dyn FnMut(&str, Option<&str>) -> Result<(), E
 /// * current
 /// * total
 /// * bytes
-pub type PushTransferProgress<'a> = dyn FnMut(usize, usize, usize) + 'a;
+pub type PushTransferProgress<'a> = dyn FnMut(usize, usize, usize) -> bool + 'a;
 
 /// Callback for pack progress
 ///
@@ -90,7 +90,7 @@ pub type PushTransferProgress<'a> = dyn FnMut(usize, usize, usize) + 'a;
 /// * stage
 /// * current
 /// * total
-pub type PackProgress<'a> = dyn FnMut(PackBuilderStage, usize, usize) + 'a;
+pub type PackProgress<'a> = dyn FnMut(PackBuilderStage, usize, usize) -> bool + 'a;
 
 /// The callback is called once between the negotiation step and the upload.
 ///
@@ -214,7 +214,7 @@ impl<'a> RemoteCallbacks<'a> {
     /// * bytes
     pub fn push_transfer_progress<F>(&mut self, cb: F) -> &mut RemoteCallbacks<'a>
     where
-        F: FnMut(usize, usize, usize) + 'a,
+        F: FnMut(usize, usize, usize) -> bool + 'a,
     {
         self.push_progress = Some(Box::new(cb) as Box<PushTransferProgress<'a>>);
         self
@@ -231,7 +231,7 @@ impl<'a> RemoteCallbacks<'a> {
     /// * total
     pub fn pack_progress<F>(&mut self, cb: F) -> &mut RemoteCallbacks<'a>
     where
-        F: FnMut(PackBuilderStage, usize, usize) + 'a,
+        F: FnMut(PackBuilderStage, usize, usize) -> bool + 'a,
     {
         self.pack_progress = Some(Box::new(cb) as Box<PackProgress<'a>>);
         self
@@ -468,18 +468,20 @@ extern "C" fn push_transfer_progress_cb(
     bytes: size_t,
     data: *mut c_void,
 ) -> c_int {
-    panic::wrap(|| unsafe {
+    let ok = panic::wrap(|| unsafe {
         let payload = &mut *(data as *mut RemoteCallbacks<'_>);
         let callback = match payload.push_progress {
             Some(ref mut c) => c,
-            None => return 0,
+            None => return true,
         };
 
-        callback(progress as usize, total as usize, bytes as usize);
-
+        callback(progress as usize, total as usize, bytes as usize)
+    });
+    if ok == Some(true) {
         0
-    })
-    .unwrap_or(-1)
+    } else {
+        -1
+    }
 }
 
 extern "C" fn pack_progress_cb(
@@ -488,20 +490,22 @@ extern "C" fn pack_progress_cb(
     total: c_uint,
     data: *mut c_void,
 ) -> c_int {
-    panic::wrap(|| unsafe {
+    let ok = panic::wrap(|| unsafe {
         let payload = &mut *(data as *mut RemoteCallbacks<'_>);
         let callback = match payload.pack_progress {
             Some(ref mut c) => c,
-            None => return 0,
+            None => return true,
         };
 
         let stage = Binding::from_raw(stage);
 
-        callback(stage, current as usize, total as usize);
-
+        callback(stage, current as usize, total as usize)
+    });
+    if ok == Some(true) {
         0
-    })
-    .unwrap_or(-1)
+    } else {
+        -1
+    }
 }
 
 extern "C" fn push_negotiation_cb(
@@ -523,4 +527,34 @@ extern "C" fn push_negotiation_cb(
         }
     })
     .unwrap_or(-1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn push_transfer_progress_can_stop_the_transfer() {
+        let mut callbacks = RemoteCallbacks::new();
+        callbacks.push_transfer_progress(|_, _, _| false);
+
+        let result = push_transfer_progress_cb(1, 2, 3, &mut callbacks as *mut _ as *mut c_void);
+
+        assert_eq!(result, -1);
+    }
+
+    #[test]
+    fn pack_progress_can_stop_pack_building() {
+        let mut callbacks = RemoteCallbacks::new();
+        callbacks.pack_progress(|_, _, _| false);
+
+        let result = pack_progress_cb(
+            raw::GIT_PACKBUILDER_ADDING_OBJECTS,
+            1,
+            2,
+            &mut callbacks as *mut _ as *mut c_void,
+        );
+
+        assert_eq!(result, -1);
+    }
 }
