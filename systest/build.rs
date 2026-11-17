@@ -46,6 +46,6 @@ fn main() {
     cfg.skip_roundtrip(|t| t == "git_clone_options" || t == "git_submodule_update_options");
 
     cfg.skip_type(|t| t == "__enum_ty");
-    cfg.skip_fn(|f| f == "git_filter_buffered_stream_new");
+    cfg.skip_fn(|f| f == "git_filter_buffered_stream_new" || f == "git_checkout_gramax_win32_rules");
     cfg.generate("../libgit2-sys/lib.rs", "all.rs");
 }

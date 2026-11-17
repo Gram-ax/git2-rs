@@ -114,12 +114,37 @@ The build is now aborting. To disable, unset the variable or use `LIBGIT2_NO_VEN
         "	return clone_repo(out, url, local_path, options, 1);",
     );
 
+    // Paths Windows refuses stay in git and are left off the disk instead of stopping the checkout:
+    // see `gramax/gramax_checkout.h`, included into `checkout.c` here.
+    let checkout = "libgit2/src/libgit2/checkout.c";
+    patch_file_str(
+        checkout,
+        "\nstatic int checkout_get_actions(\n",
+        "\n#include \"gramax_checkout.h\"\n\nstatic int checkout_get_actions(\n",
+    );
+    patch_file_str(
+        checkout,
+        "error = checkout_verify_paths(data->repo, act, delta);",
+        "error = gramax_verify_paths(data, &act, delta);",
+    );
+    patch_file_str(
+        checkout,
+        "\t\t\terror = git_futils_rmdir_r(\n\t\t\t\tdelta->old_file.path,",
+        "\t\t\terror = (actions[i] & CHECKOUT_ACTION__SKIP_WORKDIR) ? 0 : git_futils_rmdir_r(\n\t\t\t\tdelta->old_file.path,",
+    );
+    patch_file_str(
+        checkout,
+        "(error = checkout_blob(data, &delta->new_file)) < 0)",
+        "(error = gramax_checkout_blob(data, &delta->new_file, actions[i])) < 0)",
+    );
+
     // Copy over all header files
     cp_r("libgit2/include", &include);
 
     cfg.include(&include)
         .include("libgit2/src/libgit2")
         .include("libgit2/src/util")
+        .include("gramax")
         .out_dir(dst.join("build"))
         .warnings(false);
 
@@ -315,6 +340,19 @@ The build is now aborting. To disable, unset the variable or use `LIBGIT2_NO_VEN
     println!("cargo:rerun-if-changed=libgit2/include");
     println!("cargo:rerun-if-changed=libgit2/src");
     println!("cargo:rerun-if-changed=libgit2/deps");
+    println!("cargo:rerun-if-changed=gramax");
+}
+
+/// Replaces `from` with `to` once — and fails the build when the file has neither, so a libgit2 update
+/// that moves the patched code is noticed here instead of shipping a checkout without the patch.
+fn patch_file_str(path: impl AsRef<Path>, from: &str, to: &str) {
+    let path = path.as_ref();
+    let content = fs::read_to_string(path).unwrap();
+    if content.contains(to) {
+        return;
+    }
+    assert!(content.contains(from), "{}: `{}` not found, the patch needs updating", path.display(), from);
+    fs::write(path, content.replace(from, to)).unwrap();
 }
 
 fn replace_file_str(path: impl AsRef<Path>, from: &str, to: &str) {

@@ -3461,6 +3461,9 @@ extern "C" {
         opts: *const git_checkout_options,
     ) -> c_int;
     pub fn git_checkout_init_options(opts: *mut git_checkout_options, version: c_uint) -> c_int;
+    /// Gramax: applies the Windows path rules of a checkout on any platform whenever `callback`
+    /// returns non-zero (`gramax/gramax_checkout.h`). Vendored libgit2 only.
+    pub fn git_checkout_gramax_win32_rules(callback: Option<extern "C" fn() -> c_int>);
 
     // merge
     pub fn git_annotated_commit_id(commit: *const git_annotated_commit) -> *const git_oid;
